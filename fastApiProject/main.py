@@ -26,8 +26,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # async def get_session() -> AsyncSession
 
 
-@app.get('/users/{user_id}')
-async def check(user_id: int, body: dict = Body(...)):
+@app.post('/check')
+async def check(body: dict = Body(...)):
     phone = email = login = None
     print(body)
     async with async_session() as session:
@@ -35,20 +35,31 @@ async def check(user_id: int, body: dict = Body(...)):
             phone = await check_phone(body['phone'])
             email = await check_email(body['email'])
             login = await check_login(body['login'])
-            exist = await check_user(session, user_id)
-            if exist is False:
-                if (phone and email and login) is not None:
-                    await save_data(session, user_id, phone, email, login)
-                    return JSONResponse(content={"message": f"{user_id}, {phone}, {email}, {login}"}, status_code=200)
-                else:
-                    # if phone == None:
-                    #     return JSONResponse(content={"message": "phone not valid"}, status_code=200)
-                    return JSONResponse(content={"message": f"data not valid {phone} {email} {login}"}, status_code=400)
 
+            if (phone and email and login) is not None:
+                await save_data(session, phone, email, login)
+                return JSONResponse(content={"message": f"{phone}, {email}, {login}"}, status_code=200)
             else:
-                return JSONResponse(content={"message": f"user {user_id} already exist"}, status_code=400)
+                # if phone == None:
+                #     return JSONResponse(content={"message": "phone not valid"}, status_code=200)
+                return JSONResponse(content={"message": f"data not valid {phone} {email} {login}"}, status_code=400)
+
         except Exception as ex:
-            return JSONResponse(content={"message": "error"}, status_code=400)
+            return JSONResponse(content={"message": f"error {ex}"}, status_code=400)
+
+
+@app.get('/users/{user_id}')
+async def user(user_id: int):
+    async with async_session() as session:
+        try:
+            exist = await check_user(session, user_id)
+
+            if exist is not None:
+                return JSONResponse(content={"message": f"user {exist}"}, status_code=200)
+            else:
+                return JSONResponse(content={"message": f"user {user_id} not found"}, status_code=400)
+        except Exception as ex:
+            return JSONResponse(content={"message": f"error {ex}"}, status_code=400)
 
 
 if __name__ == '__main__':
